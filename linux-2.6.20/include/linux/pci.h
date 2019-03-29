@@ -343,11 +343,19 @@ struct pci_error_handlers
 struct module;
 struct pci_driver {
 	struct list_head node;
+	/* 驱动程序名，在内核中所有PCI驱动程序名都是唯一的,通常设置为和驱动程序模块相同的名字。
+	 * 装载驱动程序后，系统会在/sys/bus/pci/drivers/下面建立相关的目录
+	 */
 	char *name;
+	/* 指向pci_device_id 结构数组的指针 */
 	const struct pci_device_id *id_table;	/* must be non-NULL for probe to be called */
+	/* 指向pc驱动中probe函数的指针。当有驱动被添加到内核时，会调用此接口进行设备的初始化 */
 	int  (*probe)  (struct pci_dev *dev, const struct pci_device_id *id);	/* New device inserted */
+	/* 从系统中移除设备的接口，当设备从系统中被移除时被调用 */
 	void (*remove) (struct pci_dev *dev);	/* Device removed (NULL if not a hot-plug capable driver) */
+	/* 设备被挂起时被调用的接口，此接口可以不支持 */
 	int  (*suspend) (struct pci_dev *dev, pm_message_t state);	/* Device suspended */
+	/* 与PCI驱动程序相关 */
 	int  (*suspend_late) (struct pci_dev *dev, pm_message_t state);
 	int  (*resume_early) (struct pci_dev *dev);
 	int  (*resume) (struct pci_dev *dev);	                /* Device woken up */
