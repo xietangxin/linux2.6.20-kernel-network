@@ -3479,16 +3479,23 @@ static int __init net_dev_init(void)
 
 	BUG_ON(!dev_boot_phase);
 
+    /* 在proc文件系统中注册/proc/net/dev和/proc/net/softnet_stat文件 */
 	if (dev_proc_init())
 		goto out;
-
+		
+    /* 在新型的sysfs设备文件系统的class中注册net节点 */
 	if (netdev_sysfs_init())
 		goto out;
 
 	INIT_LIST_HEAD(&ptype_all);
+	
+	/* 初始化网络处理函数散列表 ptype_base
+	 * 这些处理函数用来处理接收到的不同协议族报文
+	 */
 	for (i = 0; i < 16; i++) 
 		INIT_LIST_HEAD(&ptype_base[i]);
 
+    /* 初始化存放网络设备的散列表 dev_name_head和dev_index_head */
 	for (i = 0; i < ARRAY_SIZE(dev_name_head); i++)
 		INIT_HLIST_HEAD(&dev_name_head[i]);
 
@@ -3497,6 +3504,7 @@ static int __init net_dev_init(void)
 
 	/*
 	 *	Initialise the packet receive queues.
+	 *   初始化与CPU相关的接收队列
 	 */
 
 	for_each_possible_cpu(i) {
@@ -3514,13 +3522,22 @@ static int __init net_dev_init(void)
 
 	netdev_dma_register();
 
+    /* 标识设备层初始化完成 */
 	dev_boot_phase = 0;
 
+    /* 在软中断系统中注册两个软中断 NET_TX_SOFTIRQ和NET_RX_SOFTIRQ
+      * 用于网络数据的发送和接收
+      */
 	open_softirq(NET_TX_SOFTIRQ, net_tx_action, NULL);
 	open_softirq(NET_RX_SOFTIRQ, net_rx_action, NULL);
 
+    /* 在通知链表上注册一个回调函数，用于响应CPU热插拔事件*/
 	hotcpu_notifier(dev_cpu_callback, 0);
+	/* 初始化目的路由缓存 */
 	dst_init();
+	/* 初始化网络设备层的组播模块，并在proc文件系统中增加/proc/net/dev_mcast,
+	 * 用来存放内核中网络设备与IP组播相关的参数
+	 */
 	dev_mcast_init();
 	rc = 0;
 out:

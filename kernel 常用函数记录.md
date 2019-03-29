@@ -12,3 +12,5 @@ if(unlikely(value)) 等价于 if(value)
 >**使用likely(),执行if后面的语句的机会更大，使用unlikely(),执行else后面的语句机会更大一些**
 
 
+
+
