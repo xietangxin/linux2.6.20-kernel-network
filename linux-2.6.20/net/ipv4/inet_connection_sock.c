@@ -576,17 +576,23 @@ void inet_csk_destroy_sock(struct sock *sk)
 
 EXPORT_SYMBOL(inet_csk_destroy_sock);
 
+/* sock:进行侦听的传输控制块 
+ * nr_table_entries:允许连接的队列长度上限，通过此值合理计算出存储连接请求块的散列表大小
+ */
 int inet_csk_listen_start(struct sock *sk, const int nr_table_entries)
 {
 	struct inet_sock *inet = inet_sk(sk);
 	struct inet_connection_sock *icsk = inet_csk(sk);
+	/* 为管理连接请求块的散列表分配存储空间，如果失败则返回相应的错误码 */
 	int rc = reqsk_queue_alloc(&icsk->icsk_accept_queue, nr_table_entries);
 
 	if (rc != 0)
 		return rc;
 
+    /* 初始化连接队列长度上限，清除当前已建立连接数 */
 	sk->sk_max_ack_backlog = 0;
 	sk->sk_ack_backlog = 0;
+	/* 初始化传输控制块中与延时发送ACK段有关的控制数据结构icsk_ack */
 	inet_csk_delack_init(sk);
 
 	/* There is race window here: we announce ourselves listening,
@@ -594,17 +600,24 @@ int inet_csk_listen_start(struct sock *sk, const int nr_table_entries)
 	 * It is OK, because this socket enters to hash table only
 	 * after validation is complete.
 	 */
+	/* 设置传输控制块状态为侦听状态(LISTEN) */
 	sk->sk_state = TCP_LISTEN;
 	if (!sk->sk_prot->get_port(sk, inet->num)) {
+	    /* 根据端口号再传输控制块中设置网络字节序的端口号成员 */
 		inet->sport = htons(inet->num);
 
+        /* 清除缓存中在传输控制块中的目的路由缓存 */
 		sk_dst_reset(sk);
+		/* 调用hash接口将该传输控制块添加到侦听散列表listenging_hash中 */
 		sk->sk_prot->hash(sk);
 
 		return 0;
 	}
-
+    /* 绑定失败处理 
+      * 设置传输控制块状态为TCP_CLOSE状态
+      */
 	sk->sk_state = TCP_CLOSE;
+	/* 释放之前分配的inet_bind_bucket实例 */
 	__reqsk_queue_destroy(&icsk->icsk_accept_queue);
 	return -EADDRINUSE;
 }
