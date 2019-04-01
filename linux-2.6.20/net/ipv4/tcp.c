@@ -2391,10 +2391,14 @@ void __init tcp_init(void)
 	unsigned long limit;
 	int order, i, max_share;
 
+    /* SKB中cb数组必须大于tcp_skb_cb结构的大小，因为TCP层会在cb中存储一个tcp_skb_cb结构 */
 	if (sizeof(struct tcp_skb_cb) > sizeof(skb->cb))
 		__skb_cb_too_small_for_tcp(sizeof(struct tcp_skb_cb),
 					   sizeof(skb->cb));
 
+    /* 创建用于分配inet_bind_hashbucket 结构的后备高速缓存，
+      * 该结构主要用来存储管理已绑定端口的信息
+      */
 	tcp_hashinfo.bind_bucket_cachep =
 		kmem_cache_create("tcp_bind_bucket",
 				  sizeof(struct inet_bind_bucket), 0,
@@ -2404,6 +2408,10 @@ void __init tcp_init(void)
 	 * hash tables.
 	 *
 	 * The methodology is similar to that of the buffer cache.
+	 */
+	/* 分配用于存储TCP状态established的传输控制块的散列表 
+	 * 根据thash_entries得到散列表的大小ehash_size
+	 * thash_entries作为内核参数，是TCP_ESTABLISHED状态TCP套接口散列表允许使用的大小
 	 */
 	tcp_hashinfo.ehash =
 		alloc_large_system_hash("TCP established",
@@ -2415,12 +2423,17 @@ void __init tcp_init(void)
 					&tcp_hashinfo.ehash_size,
 					NULL,
 					0);
+	/* 初始化ehash散列表 */
 	tcp_hashinfo.ehash_size = (1 << tcp_hashinfo.ehash_size) >> 1;
 	for (i = 0; i < (tcp_hashinfo.ehash_size << 1); i++) {
 		rwlock_init(&tcp_hashinfo.ehash[i].lock);
 		INIT_HLIST_HEAD(&tcp_hashinfo.ehash[i].chain);
 	}
 
+    /* 分配用于存储已绑定端口信息的散列表；
+      * 并根据ehash_size得到散列表的大小bhash_size
+      * 然后初始化bhash散列表
+      */
 	tcp_hashinfo.bhash =
 		alloc_large_system_hash("TCP bind",
 					sizeof(struct inet_bind_hashbucket),
@@ -2440,10 +2453,12 @@ void __init tcp_init(void)
 	/* Try to be a bit smarter and adjust defaults depending
 	 * on available memory.
 	 */
+	/* 根据bhash_size来计算order的值, order用来确定如何设置可分配端口的区间 */
 	for (order = 0; ((1 << order) << PAGE_SHIFT) <
 			(tcp_hashinfo.bhash_size * sizeof(struct inet_bind_hashbucket));
 			order++)
 		;
+    /* 由于order表示系统能提供资源的多少，因此需根据order的大小来设置可绑定端口的区间 */
 	if (order >= 4) {
 		sysctl_local_port_range[0] = 32768;
 		sysctl_local_port_range[1] = 61000;
@@ -2457,11 +2472,14 @@ void __init tcp_init(void)
 		sysctl_max_syn_backlog = 128;
 	}
 
-	/* Allow no more than 3/4 kernel memory (usually less) allocated to TCP */
+	/* Allow no more than 3/4 kernel memory (usually less) allocated to TCP 
+	 * 初始化系统控制参数tcp_mem,是一组用于控制TCP栈缓存使用的阈值
+	 */
 	sysctl_tcp_mem[0] = (1536 / sizeof (struct inet_bind_hashbucket)) << order;
 	sysctl_tcp_mem[1] = sysctl_tcp_mem[0] * 4 / 3;
 	sysctl_tcp_mem[2] = sysctl_tcp_mem[0] * 2;
 
+    /* 初始化系统控制参数tcp_wmem和tcp_rmem */
 	limit = ((unsigned long)sysctl_tcp_mem[1]) << (PAGE_SHIFT - 7);
 	max_share = min(4UL*1024*1024, limit);
 
@@ -2477,6 +2495,7 @@ void __init tcp_init(void)
 	       "(established %d bind %d)\n",
 	       tcp_hashinfo.ehash_size << 1, tcp_hashinfo.bhash_size);
 
+    /* 向TCP传输控制块中注册reno拥塞控制算法，这是系统默认的拥塞控制算法 */
 	tcp_register_congestion_control(&tcp_reno);
 }
 
