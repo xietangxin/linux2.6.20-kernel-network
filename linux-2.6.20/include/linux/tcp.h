@@ -219,8 +219,8 @@ struct tcp_request_sock {
 	/* Only used by TCP MD5 Signature so far. */
 	struct tcp_request_sock_ops	*af_specific;
 #endif
-	u32			 	rcv_isn;
-	u32			 	snt_isn;
+	u32			 	rcv_isn; //客户端的初始序号
+	u32			 	snt_isn; //服务端的初始序号
 };
 
 static inline struct tcp_request_sock *tcp_rsk(const struct request_sock *req)

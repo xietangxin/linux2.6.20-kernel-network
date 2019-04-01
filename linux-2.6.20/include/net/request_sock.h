@@ -26,17 +26,26 @@ struct sk_buff;
 struct dst_entry;
 struct proto;
 
+/* 处理连接请求的函数指针表
+ */
 struct request_sock_ops {
-	int		family;
-	int		obj_size;
+	int		family;     //所属协议族
+	/* tcp_request_sock结构长度,用于创建分配连接请求块的高速缓存slab
+	 * 该缓存在注册传输层协议时创建，
+	 */
+	int		obj_size;   
 	struct kmem_cache	*slab;
+	/* 发送SYN+ACK段的函数指针，TCP中为tcp_v4_send_synack()  */
 	int		(*rtx_syn_ack)(struct sock *sk,
 				       struct request_sock *req,
 				       struct dst_entry *dst);
+    /* 发送ACK段的函数指针，TCP中为tcp_v4_reqsk_send_ack() */
 	void		(*send_ack)(struct sk_buff *skb,
 				    struct request_sock *req);
+    /* 发送RST段的函数指针，TCP中为tcp_v4_send_reset() */
 	void		(*send_reset)(struct sock *sk,
 				      struct sk_buff *skb);
+    /* 析构函数， 在释放连接请求块时被调用，用来清理释放资源，TCP中为tcp_v4_reqsk_destructor()*/
 	void		(*destructor)(struct request_sock *req);
 };
 
@@ -86,13 +95,22 @@ extern int sysctl_max_syn_backlog;
  * @max_qlen_log - log_2 of maximal queued SYNs/REQUESTs
  */
 struct listen_sock {
+    /* 实际分配用来保存SYN请求连接的request_sock结构数组的长度
+      * 其值为nr_table_entries以2为底的对数
+      */
 	u8			max_qlen_log;
-	/* 3 bytes hole, try to use */
+	/* 3 bytes hole, try to use 
+	 * 当前连接请求块数目
+	 */
 	int			qlen;
+	/* 当前未重传过SYN+ACK段的请求块数目 */
 	int			qlen_young;
 	int			clock_hand;
+	/* 用来计算SYN请求块散列表键值的随机数 */
 	u32			hash_rnd;
+	/* 实际分配用来保存SYN请求连接的request_sock结构数组的长度 */
 	u32			nr_table_entries;
+	/* 指向request_sock结构散列表，在listen系统调用中生成 */
 	struct request_sock	*syn_table[0];
 };
 
