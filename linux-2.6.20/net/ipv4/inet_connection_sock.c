@@ -66,6 +66,11 @@ EXPORT_SYMBOL_GPL(inet_csk_bind_conflict);
 
 /* Obtain a reference to a local port for the given sock,
  * if snum is zero it means select any available local port.
+ * hashinfo:TCP散列表管理结构实例tcp_hashinfo
+ * sk:当前进行绑定操作的传输控制块
+ * snum:进行绑定的端口号
+ * bind_conflict:一个函数指针，用来在指定端口信息块的传输控制块链表上查找是否
+ *  存在与待绑定传输控制块相冲突的传输控制块
  */
 int inet_csk_get_port(struct inet_hashinfo *hashinfo,
 		      struct sock *sk, unsigned short snum,
@@ -77,25 +82,35 @@ int inet_csk_get_port(struct inet_hashinfo *hashinfo,
 	struct inet_bind_bucket *tb;
 	int ret;
 
+    /* 禁止下半部，进程与下半部之间进行同步 */
 	local_bh_disable();
 	if (!snum) {
+	    /* 获取自动分配端口的区间[low, high],重试分配次数remaining 
+	      * 并随机生成一个在分配区间内的起始端口号rover
+	      */
 		int low = sysctl_local_port_range[0];
 		int high = sysctl_local_port_range[1];
 		int remaining = (high - low) + 1;
 		int rover = net_random() % (high - low) + low;
-
+		
+        /* 开始尝试获取空闲的端口号 */
 		do {
+		    /* 从bhash散列表上根据端口号和bhash_size计算得到的键值获取一链表 */
 			head = &hashinfo->bhash[inet_bhashfn(rover, hashinfo->bhash_size)];
+            /* 然后加锁后遍历该链表，判断是否有相同的端口号再此链表上 */
 			spin_lock(&head->lock);
 			inet_bind_bucket_for_each(tb, node, &head->chain)
 				if (tb->port == rover)
 					goto next;
 			break;
 		next:
+		    /* 如果有相同的端口号，说明该端口号已被使用，将端口号加1  
+		      * 如果超过区间的右端点，则修改为区间的左端点
+		      */
 			spin_unlock(&head->lock);
 			if (++rover > high)
 				rover = low;
-		} while (--remaining > 0);
+		} while (--remaining > 0); // 移植尝试，直至成功或尝试次数达到remaining
 
 		/* Exhausted local port range during search?  It is not
 		 * possible for us to be holding one of the bind hash
@@ -103,7 +118,9 @@ int inet_csk_get_port(struct inet_hashinfo *hashinfo,
 		 * drops to zero, we broke out of the do/while loop at
 		 * the top level, not from the 'break;' statement.
 		 */
+		/* 获取空闲端口已完成，但成功与否还不清楚，因此先初始化返回值为1 */
 		ret = 1;
+		/* 如果所有尝试次数都已用完，则说明获取端口失败，跳转fail处直接返回失败退出 */
 		if (remaining <= 0)
 			goto fail;
 
@@ -112,6 +129,7 @@ int inet_csk_get_port(struct inet_hashinfo *hashinfo,
 		 */
 		snum = rover;
 	} else {
+	    /* 如果是指定端口号，则需要在已绑定的信息中查找，根据不同的查找结果进行不同的处理 */
 		head = &hashinfo->bhash[inet_bhashfn(snum, hashinfo->bhash_size)];
 		spin_lock(&head->lock);
 		inet_bind_bucket_for_each(tb, node, &head->chain)
@@ -146,6 +164,7 @@ tb_not_found:
 		   (!sk->sk_reuse || sk->sk_state == TCP_LISTEN))
 		tb->fastreuse = 0;
 success:
+    /* 调用inet_bind_hash()完成传输控制块与端口的绑定 */
 	if (!inet_csk(sk)->icsk_bind_hash)
 		inet_bind_hash(sk, tb, snum);
 	BUG_TRAP(inet_csk(sk)->icsk_bind_hash == tb);
