@@ -113,11 +113,16 @@ struct listen_sock {
  * are always protected from the main sock lock.
  */
 struct request_sock_queue {
+    /* 指向tcp_request_sock结构链表的首尾，该链表中为完成连接后的连接请求块
+      * listen_opt中的连接请求块会移至此链表中等待系统调用accept()将其取走
+      */
 	struct request_sock	*rskq_accept_head;
 	struct request_sock	*rskq_accept_tail;
 	rwlock_t		syn_wait_lock;
 	u8			rskq_defer_accept;
-	/* 3 bytes hole, try to pack */
+	/* 3 bytes hole, try to pack 
+	 * 指向一个listen_sock结构实例，该实例在侦听时建立
+	 */
 	struct listen_sock	*listen_opt;
 };
 
