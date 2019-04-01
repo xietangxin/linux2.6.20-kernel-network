@@ -280,12 +280,18 @@ struct net_device
 	 * the interface.
 	 */
 	char			name[IFNAMSIZ];
-	/* device name hash chain */
+	/* device name hash chain 
+	 * 根据网络设备名以散列表的形式组织到dev_name_head散列表中，这样就可以通过
+	 * 网络设备名快速定位到对应的网络设备
+	 */
 	struct hlist_node	name_hlist;
 
 	/*
 	 *	I/O specific fields
 	 *	FIXME: Merge these and struct ifmap into one
+	 *   mem_end和mem_start是网络设备共享内存的起始和终止地址
+	 *   base_addr:网络接口I/O基地址
+	 *   irq:分配给设备的中断号
 	 */
 	unsigned long		mem_end;	/* shared mem end	*/
 	unsigned long		mem_start;	/* shared mem start	*/
@@ -297,11 +303,13 @@ struct net_device
 	 *	part of the usual set specified in Space.c.
 	 */
 
+    /* 指定多端口设备上使用哪个端口 */
 	unsigned char		if_port;	/* Selectable AUI, TP,..*/
+	/* 为设备分配DMA通道 */
 	unsigned char		dma;		/* DMA channel		*/
-
+    /* 设备状态 */
 	unsigned long		state;
-
+    /* 指向net_device结构链表下一个设备的指针，系统中的所有网络设备都是它组织起来 */
 	struct net_device	*next;
 	
 	/* The device initialization function. Called only once. */
@@ -309,7 +317,9 @@ struct net_device
 
 	/* ------- Fields preinitialized in Space.c finish here ------- */
 
-	/* Net device features */
+	/* Net device features 
+	 * 接口支持的特性
+	 */
 	unsigned long		features;
 #define NETIF_F_SG		1	/* Scatter/gather IO. */
 #define NETIF_F_IP_CSUM		2	/* Can checksum only TCP/UDP over IPv4. */
@@ -339,6 +349,7 @@ struct net_device
 #define NETIF_F_GEN_CSUM	(NETIF_F_NO_CSUM | NETIF_F_HW_CSUM)
 #define NETIF_F_ALL_CSUM	(NETIF_F_IP_CSUM | NETIF_F_GEN_CSUM)
 
+    /* 用于链接那些已调度有数据包输出的网络设备的指针 */
 	struct net_device	*next_sched;
 
 	/* Interface index. Unique device identifier	*/
@@ -346,6 +357,7 @@ struct net_device
 	int			iflink;
 
 
+    /* 提供给应用程序获得接口统计信息的接口 */
 	struct net_device_stats* (*get_stats)(struct net_device *dev);
 
 	/* List of functions to handle Wireless Extensions (instead of ioctl).
@@ -354,6 +366,7 @@ struct net_device
 	/* Instance data managed by the core of Wireless Extensions. */
 	struct iw_public_data *	wireless_data;
 
+    /* ethtool操作接口 */
 	const struct ethtool_ops *ethtool_ops;
 
 	/*
@@ -362,40 +375,46 @@ struct net_device
 	 * will (read: may be cleaned up at will).
 	 */
 
-
+    /* 标识接口特性 */
 	unsigned int		flags;	/* interface flags (a la BSD)	*/
 	unsigned short		gflags;
-        unsigned short          priv_flags; /* Like 'flags' but invisible to userspace. */
+    unsigned short      priv_flags; /* Like 'flags' but invisible to userspace. */
+    /* net_device实例需要32字节对齐，padded为填充字节数 */
 	unsigned short		padded;	/* How much padding added by alloc_netdev() */
 
 	unsigned char		operstate; /* RFC2863 operstate */
 	unsigned char		link_mode; /* mapping policy to operstate */
 
-	unsigned		mtu;	/* interface MTU value		*/
+    /* 最大传输单元MTU */
+	unsigned		    mtu;	/* interface MTU value		*/
+	/* 接口的硬件类型 */
 	unsigned short		type;	/* interface hardware type	*/
+	/* 硬件首部的长度 */
 	unsigned short		hard_header_len;	/* hardware hdr length	*/
 
 	struct net_device	*master; /* Pointer to master device of a group,
-					  * which this device is member of.
-					  */
+					                 * which this device is member of.
+					                 */
 
-	/* Interface address info. */
+	/*  Interface address info. 
+	 *  硬件(MAC)地址，通常在初始化过程中从硬件读取
+    	 */
 	unsigned char		perm_addr[MAX_ADDR_LEN]; /* permanent hw address */
 	unsigned char		addr_len;	/* hardware address length	*/
-	unsigned short          dev_id;		/* for shared network cards */
+	unsigned short      dev_id;		/* for shared network cards */
 
 	struct dev_mc_list	*mc_list;	/* Multicast mac addresses	*/
-	int			mc_count;	/* Number of installed mcasts	*/
-	int			promiscuity;
-	int			allmulti;
+	int			        mc_count;	/* Number of installed mcasts	*/
+	int			        promiscuity;
+	int			        allmulti;
 
 
 	/* Protocol specific pointers */
 	
 	void 			*atalk_ptr;	/* AppleTalk link 	*/
 	void			*ip_ptr;	/* IPv4 specific data	*/  
-	void                    *dn_ptr;        /* DECnet specific data */
-	void                    *ip6_ptr;       /* IPv6 specific data */
+	void            *dn_ptr;        /* DECnet specific data */
+	void            *ip6_ptr;       /* IPv6 specific data */
 	void			*ec_ptr;	/* Econet specific data	*/
 	void			*ax25_ptr;	/* AX.25 specific data */
 
@@ -405,7 +424,9 @@ struct net_device
 	struct list_head	poll_list ____cacheline_aligned_in_smp;
 					/* Link to poll list	*/
 
+    /* 用来以轮询模式操作接口，中断和轮询结合会显著提高性能 */
 	int			(*poll) (struct net_device *dev, int *quota);
+	/* 读取数据包的配额 */
 	int			quota;
 	int			weight;
 	unsigned long		last_rx;	/* Time of last Rx	*/
@@ -419,7 +440,7 @@ struct net_device
  * Cache line mostly used on queue transmit path (qdisc)
  */
 	/* device queue lock */
-	spinlock_t		queue_lock ____cacheline_aligned_in_smp;
+	spinlock_t		    queue_lock ____cacheline_aligned_in_smp;
 	struct Qdisc		*qdisc;
 	struct Qdisc		*qdisc_sleeping;
 	struct list_head	qdisc_list;
@@ -429,7 +450,7 @@ struct net_device
 	struct sk_buff		*gso_skb;
 
 	/* ingress path synchronizer */
-	spinlock_t		ingress_lock;
+	spinlock_t		    ingress_lock;
 	struct Qdisc		*qdisc_ingress;
 
 /*
@@ -441,7 +462,7 @@ struct net_device
 	   if nobody entered there.
 	 */
 	int			xmit_lock_owner;
-	void			*priv;	/* pointer to private data	*/
+	void		*priv;	/* pointer to private data	*/
 	int			(*hard_start_xmit) (struct sk_buff *skb,
 						    struct net_device *dev);
 	/* These may be needed for future network-power-down code. */
