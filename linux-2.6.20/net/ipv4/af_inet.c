@@ -194,15 +194,21 @@ int inet_listen(struct socket *sock, int backlog)
 	lock_sock(sk);
 
 	err = -EINVAL;
+	/* 检测调用listen的套接口的当前状态和类型。如果套接口状态不是SS_UNCONNECTED， 
+	 * 或套接口类型不是SOCK_STREAM，则不允许进行侦听操作
+	 */
 	if (sock->state != SS_UNCONNECTED || sock->type != SOCK_STREAM)
 		goto out;
-
+    /* 进行listen调用的传输控制块的状态 */
 	old_state = sk->sk_state;
 	if (!((1 << old_state) & (TCPF_CLOSE | TCPF_LISTEN)))
 		goto out;
 
 	/* Really, if the socket is already in listen state
 	 * we can only allow the backlog to be adjusted.
+	 */
+	/* 如果传输控制块不在LISTEN状态，则调用inet_csk_listen_start()进行侦听操作
+	 * 最后，无论是否在LISTEN状态都需设置传输控制块的连接队列长度上限
 	 */
 	if (old_state != TCP_LISTEN) {
 		err = inet_csk_listen_start(sk, backlog);
