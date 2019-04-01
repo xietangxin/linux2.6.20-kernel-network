@@ -265,10 +265,12 @@ void inet_csk_init_xmit_timers(struct sock *sk,
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
 
+    /* 初始化icsk_retransmit_timer icsk_delack_timer sk_timer 三个定时器  */
 	init_timer(&icsk->icsk_retransmit_timer);
 	init_timer(&icsk->icsk_delack_timer);
 	init_timer(&sk->sk_timer);
 
+    /* 设置以上三个定时器的处理例程及例程参数 */
 	icsk->icsk_retransmit_timer.function = retransmit_handler;
 	icsk->icsk_delack_timer.function     = delack_handler;
 	sk->sk_timer.function		     = keepalive_handler;
@@ -277,6 +279,7 @@ void inet_csk_init_xmit_timers(struct sock *sk,
 		icsk->icsk_delack_timer.data =
 			sk->sk_timer.data  = (unsigned long)sk;
 
+    /* 初始化延时确认模式 */
 	icsk->icsk_pending = icsk->icsk_ack.pending = 0;
 }
 
