@@ -404,6 +404,11 @@ extern int sysctl_tcp_synack_retries;
 
 EXPORT_SYMBOL_GPL(inet_csk_reqsk_queue_hash_add);
 
+/* parent: 进行侦听的传输控制块
+ * interval:建立连接定时器的超时时间
+ * timeout: 往返超时的初始值。每超时一次，加倍上次的超时时间
+ * max_rto: 往返时间的最大值
+ */
 void inet_csk_reqsk_queue_prune(struct sock *parent,
 				const unsigned long interval,
 				const unsigned long timeout,

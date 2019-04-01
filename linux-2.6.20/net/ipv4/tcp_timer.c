@@ -427,6 +427,7 @@ out_unlock:
 
 static void tcp_synack_timer(struct sock *sk)
 {
+    /* 扫描半连接散列表，然后设定建立连接定时器，间隔时间为TCP_SYNQ_INTERVAL */
 	inet_csk_reqsk_queue_prune(sk, TCP_SYNQ_INTERVAL,
 				   TCP_TIMEOUT_INIT, TCP_RTO_MAX);
 }
@@ -445,12 +446,15 @@ void tcp_set_keepalive(struct sock *sk, int val)
 
 static void tcp_keepalive_timer (unsigned long data)
 {
+    /* 将参数data转换为对应的传输控制块 */
 	struct sock *sk = (struct sock *) data;
 	struct inet_connection_sock *icsk = inet_csk(sk);
 	struct tcp_sock *tp = tcp_sk(sk);
 	__u32 elapsed;
 
-	/* Only process if socket is not in use. */
+	/* Only process if socket is not in use.
+	 * 如果传输控制块被用户进程锁定，则重新设置定时时间，0.05s后再次激活
+	 */
 	bh_lock_sock(sk);
 	if (sock_owned_by_user(sk)) {
 		/* Try again later. */ 
@@ -458,6 +462,7 @@ static void tcp_keepalive_timer (unsigned long data)
 		goto out;
 	}
 
+    /* 如果当前TCP状态是LISTEN，则说明执行的是连接建立定时器，调用tcp_synack_timer() */
 	if (sk->sk_state == TCP_LISTEN) {
 		tcp_synack_timer(sk);
 		goto out;
