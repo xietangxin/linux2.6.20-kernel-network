@@ -224,15 +224,24 @@ static inline struct tcp_request_sock *tcp_rsk(const struct request_sock *req)
 	return (struct tcp_request_sock *)req;
 }
 
+/* tcp_sock 结构是TCP协议的控制块，它在inet_connection_sock结构的基础上
+ * 扩张了滑动窗口协议,拥塞控制算法等一些TCP专有属性。
+ */
 struct tcp_sock {
 	/* inet_connection_sock has to be the first member of tcp_sock */
 	struct inet_connection_sock	inet_conn;
+	/* TCP 首部长度，包括TCP选项 */
 	u16	tcp_header_len;	/* Bytes of tcp header to send		*/
+	/* 记录该套接口发送到网络设备段的长度
+	 * 在不支持TSO的情况下，其值等于MSS
+	 * 如果网卡支持TSO且采用TSO进行发送，则需要重新计算
+	 */
 	u16	xmit_size_goal;	/* Goal for segmenting output packets	*/
 
 /*
  *	Header prediction flags
  *	0x5?10 << 16 + snd_wnd in net byte order
+ *   首部预测标志
  */
 	__be32	pred_flags;
 
@@ -240,22 +249,41 @@ struct tcp_sock {
  *	RFC793 variables by their proper names. This means you can
  *	read the code and the spec side by side (and laugh ...)
  *	See RFC793 and RFC1122. The RFC writes these in capitals.
+ *   rcv_nxt:等待接收的下一个TCP段的序号，每接收一个TCP段之后都会更新该值
+ *   snd_nxt:等待发送下一个TCP段的序号
  */
  	u32	rcv_nxt;	/* What we want to receive next 	*/
  	u32	snd_nxt;	/* Next sequence we send		*/
 
+    /* 在输出的段中，最早一个未确认段的序号 */
  	u32	snd_una;	/* First byte we want an ack for	*/
+ 	/* 最近发送的小包(小于MSS的段)的最后一个字节序号，在发送成功段后，如果报文小于MSS,
+ 	 * 即更新该字段，主要用来判断是否启动Nagle算法
+ 	 */
  	u32	snd_sml;	/* Last byte of the most recently transmitted small packet */
+ 	/* 最近一次收到ACK段的时间，用于TCP保活 */
 	u32	rcv_tstamp;	/* timestamp of last received ACK (for keepalives) */
+	/* 最近一次发送数据包的时间，主要用于拥塞窗口的设置 */
 	u32	lsndtime;	/* timestamp of last sent data packet (for restart window) */
 
-	/* Data for direct copy to user */
+	/* Data for direct copy to user 
+	 * 用来控制复制数据到用户进程的控制块
+	 */
 	struct {
+	    /* 如果未启动tcp_low_latency,TCP段将首先缓存到此队列，
+	      * 直到进程主要读取到才真正地接收到接收到接收队列中并处理
+	      */
 		struct sk_buff_head	prequeue;
+		/* 在未启动tcp_low_latency情况下，当前正在读取TCP流的进程，如果NULL则表示暂时没有进程对其进行读取 */
 		struct task_struct	*task;
+		/* 在未启动tcp_low_latency情况下，用来存放数据的用户空间地址，在接收处理TCP段时直接复制到用户空间 */
 		struct iovec		*iov;
+		/* prequeue队列当前消耗的内存 */
 		int			memory;
+		/* 用户缓存中当前可以使用的缓存大小，由recv等系统调用的len参数初始化 */
 		int			len;
+
+		/* 网络设备的DMA相关 */
 #ifdef CONFIG_NET_DMA
 		/* members for async copy */
 		struct dma_chan		*dma_chan;
@@ -265,24 +293,40 @@ struct tcp_sock {
 #endif
 	} ucopy;
 
+    /* 记录更新发送窗口的那个ACK段序号，用来判断是否需要更新窗口
+      * 如果后续收到的ACK段的序号大于snd_wll,则需要更新窗口，否则无需更新
+      */
 	u32	snd_wl1;	/* Sequence for window update		*/
+	/* 接收方提供的接受窗口大小，即发送方发送窗口大小  */
 	u32	snd_wnd;	/* The window we expect to receive	*/
+	/* 接收方通告过的最大接受窗口值 */
 	u32	max_window;	/* Maximal window ever seen from peer	*/
+	/* 发送方当前有效的MSS */
 	u32	mss_cache;	/* Cached effective mss, not including SACKS */
 
+    /* 滑动窗口的最大值，滑动窗口大小在变化过程中始终不能超过该值。 
+      * 在TCP建立连接时，该字段被初始化，置为最大的16位整数左移窗口的扩大因子的位数
+      */
 	u32	window_clamp;	/* Maximal window to advertise		*/
+	/* 当前接收窗口大小的阈值  */
 	u32	rcv_ssthresh;	/* Current window clamp			*/
 
 	u32	frto_highmark;	/* snd_nxt when RTO occurred */
 	u8	reordering;	/* Packet reordering metric.		*/
 	u8	frto_counter;	/* Number of new acks after RTO */
+	/* 标识是否允许Nagle算法 */
 	u8	nonagle;	/* Disable Nagle algorithm?             */
+	/* 保活探测次数，最大值为127 */
 	u8	keepalive_probes; /* num of allowed keep alive probes	*/
 
 /* RTT measurement */
+    /* 平滑的RTT,为避免浮点运算，是指将其放大8倍后存储的 */
 	u32	srtt;		/* smoothed round trip time << 3	*/
+	/* RTT平均偏差，由RTT与RTT均值偏差绝对值加权平均而得到，其值越大说明RTT抖动得越厉害 */
 	u32	mdev;		/* medium deviation			*/
+	/* 跟踪每次发生窗口内的段被全部确认过程中，RTT平均偏差的最大值，描述RTT抖动的最大范围 */
 	u32	mdev_max;	/* maximal mdev for the last rtt period	*/
+	/* 平滑的RTT平均偏差，由mdev计算得到，用来计算RTO */
 	u32	rttvar;		/* smoothed mdev_max			*/
 	u32	rtt_seq;	/* sequence number to update rttvar	*/
 
