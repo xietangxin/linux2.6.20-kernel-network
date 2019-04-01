@@ -37,17 +37,31 @@ struct tcp_congestion_ops;
  * (i.e. things that depend on the address family)
  */
 struct inet_connection_sock_af_ops {
+    /* 从传输层向网络层传输的接口，TCP中设置为ip_queue_xmit() */
 	int	    (*queue_xmit)(struct sk_buff *skb, int ipfragok);
+	/* 计算传输层首部校验和函数，TCP中设置为tcp_v4_send_check() */
 	void	    (*send_check)(struct sock *sk, int len,
 				  struct sk_buff *skb);
+	/* 如果此传输控制块还没有路由缓存项，为传输控制块选择路由缓存项
+	 * TCP中设置为inet_sk_rebuild_header()
+	 */
 	int	    (*rebuild_header)(struct sock *sk);
+	/* 处理连接请求接口，TCP设置为tcp_v4_conn_request() */
 	int	    (*conn_request)(struct sock *sk, struct sk_buff *skb);
+	/* 在完成三次握手后，调用此接口来创建一个新的套接口，TCP中初始化为tcp_v4_syn_recv_sock() */
 	struct sock *(*syn_recv_sock)(struct sock *sk, struct sk_buff *skb,
 				      struct request_sock *req,
 				      struct dst_entry *dst);
+    /* 在启动tw_recycle情况下，关闭套接口时，记录相关时间戳信息到对端信息管理块中。
+      * TCP中设置为tcp_v4_remember_stamp()
+      */
 	int	    (*remember_stamp)(struct sock *sk);
+	/* 在IPv4中为IP首部的长度，即iphdr结构的大小 */
 	u16	    net_header_len;
+	/*IP套接口地址长度，在IPv4中就是sockaddr_in结构的长度 */
 	u16	    sockaddr_len;
+
+	/* 传输层 setsockopt getsockopt compat_setsockopt compat_getsockopt 系统调用接口 */
 	int	    (*setsockopt)(struct sock *sk, int level, int optname, 
 				  char __user *optval, int optlen);
 	int	    (*getsockopt)(struct sock *sk, int level, int optname, 
@@ -58,6 +72,10 @@ struct inet_connection_sock_af_ops {
 	int	    (*compat_getsockopt)(struct sock *sk,
 				int level, int optname,
 				char __user *optval, int __user *optlen);
+
+	/* 将IP套接口地址结构中的地址信息复制到传输控制块中，TCP中为inet_csk_addr2_sockaddr() 
+	 * 实际上该接口并未使用
+	 */
 	void	    (*addr2sockaddr)(struct sock *sk, struct sockaddr *);
 };
 
