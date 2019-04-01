@@ -21,22 +21,26 @@
 #include <asm/byteorder.h>
 #include <linux/socket.h>
 
+/* 
+ * linux 中定义TCP首部
+ */
 struct tcphdr {
-	__be16	source;
-	__be16	dest;
-	__be32	seq;
-	__be32	ack_seq;
+	__be16	source; // 16位源端口号
+	__be16	dest;   // 16位目的端口号
+	__be32	seq;    // 32位序号
+	__be32	ack_seq;// 32位确认序号
+/* 大小端数据排序不同 */
 #if defined(__LITTLE_ENDIAN_BITFIELD)
-	__u16	res1:4,
-		doff:4,
-		fin:1,
-		syn:1,
-		rst:1,
-		psh:1,
-		ack:1,
-		urg:1,
-		ece:1,
-		cwr:1;
+	__u16	res1:4, // 4位首部长度
+		doff:4,     // 4位保留
+		fin:1,      // fin
+		syn:1,      // syn
+		rst:1,      // rst
+		psh:1,      // psh
+		ack:1,      // ack
+		urg:1,      // urg
+		ece:1,      // ece
+		cwr:1;      // cwr
 #elif defined(__BIG_ENDIAN_BITFIELD)
 	__u16	doff:4,
 		res1:4,
@@ -51,9 +55,9 @@ struct tcphdr {
 #else
 #error	"Adjust your <asm/byteorder.h> defines"
 #endif	
-	__be16	window;
-	__sum16	check;
-	__be16	urg_ptr;
+	__be16	window; // 16位窗口大小
+	__sum16	check;  // 16位校验和
+	__be16	urg_ptr;// 16位紧急指针
 };
 
 /*
